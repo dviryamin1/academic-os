@@ -12,6 +12,9 @@ dependencies = [
     "SQLAlchemy>=2.0,<3",
 ]
 
+[project.scripts]
+academic-os = "academic_os.interfaces.cli:main"
+
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 

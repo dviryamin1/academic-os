@@ -133,6 +133,7 @@ class CurriculumItemModel(Base):
     __tablename__ = "curriculum_items"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    code: Mapped[str] = mapped_column(String)
     parent_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("curriculum_items.id"),
         nullable=True,
@@ -142,6 +143,7 @@ class CurriculumItemModel(Base):
     item_type: Mapped[str] = mapped_column(String)
     course_id: Mapped[UUID] = mapped_column(ForeignKey("courses.id"), index=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pages: Mapped[str | None] = mapped_column(String, nullable=True)
     order: Mapped[int] = mapped_column()
 
     parent: Mapped[CurriculumItemModel | None] = relationship(

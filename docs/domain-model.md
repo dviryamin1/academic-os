@@ -94,7 +94,13 @@ The raw `type: str` field became
 object provides a stable domain boundary without closing institution-specific
 types behind an enum.
 
-### 8. Existing boundaries were preserved
+### 8. CurriculumItem gained code and pages
+
+Sprint 2B added `code` as a stable human-readable reference while preserving
+the UUID `id` as the internal identity. Optional `pages` preserves source page
+ranges without treating them as numeric values.
+
+### 9. Existing boundaries were preserved
 
 - `CurriculumItem` still supports unlimited parent-child hierarchy.
 - `StudyTask`, `StudySession`, `StudyProgress`, `Note`, and `StudyPlanItem`

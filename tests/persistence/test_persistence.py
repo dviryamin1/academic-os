@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
@@ -73,20 +74,24 @@ def test_complete_domain_graph_can_be_persisted(
     )
     chapter = CurriculumItem(
         id=uuid4(),
+        code="PSY-101.1",
         parent_id=None,
         title="Foundations",
         item_type=CurriculumItemType(CurriculumItemType.CHAPTER),
         course_id=course.id,
         source="Textbook",
+        pages="1-20",
         order=1,
     )
     topic = CurriculumItem(
         id=uuid4(),
+        code="PSY-101.1.1",
         parent_id=chapter.id,
         title="Scientific method",
         item_type=CurriculumItemType(CurriculumItemType.TOPIC),
         course_id=course.id,
         source=None,
+        pages=None,
         order=1,
     )
     study_plan = StudyPlan(id=uuid4(), semester_id=semester.id)
@@ -241,6 +246,66 @@ def test_event_round_trip_preserves_optional_end_time(
         assert loaded_without_end.ends_at is None
         assert loaded_with_end == event_with_end
         assert loaded_with_end.ends_at == event_with_end.ends_at
+
+
+def test_repository_updates_immutable_task_and_progress(
+    session_factory: SessionFactory,
+) -> None:
+    institution = Institution(id=uuid4(), name="Update University")
+    course = Course(
+        id=uuid4(),
+        institution_id=institution.id,
+        code="UPDATE-101",
+        title="Update Course",
+    )
+    curriculum_item = CurriculumItem(
+        id=uuid4(),
+        code="UPDATE-1",
+        parent_id=None,
+        title="Update Topic",
+        item_type=CurriculumItemType(CurriculumItemType.TOPIC),
+        course_id=course.id,
+        source=None,
+        pages=None,
+        order=1,
+    )
+    task = StudyTask(
+        id=uuid4(),
+        curriculum_item_id=curriculum_item.id,
+        task_type=StudyTaskType(StudyTaskType.READING),
+        title="Read",
+        due_at=None,
+        completed_at=None,
+    )
+    progress = StudyProgress(
+        id=uuid4(),
+        curriculum_item_id=curriculum_item.id,
+        status=StudyProgressStatus(StudyProgressStatus.NOT_STARTED),
+    )
+
+    with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
+        unit_of_work.institutions.add(institution)
+        unit_of_work.courses.add(course)
+        unit_of_work.curriculum_items.add(curriculum_item)
+        unit_of_work.study_tasks.add(task)
+        unit_of_work.study_progress.add(progress)
+        unit_of_work.commit()
+
+    completed_at = datetime(2026, 11, 3, 12, 0)
+    completed_task = replace(task, completed_at=completed_at)
+    mastered_progress = replace(
+        progress,
+        status=StudyProgressStatus(StudyProgressStatus.MASTERED),
+    )
+
+    with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
+        unit_of_work.study_tasks.update(completed_task)
+        unit_of_work.study_progress.update(mastered_progress)
+        unit_of_work.commit()
+
+    with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
+        assert unit_of_work.study_tasks.get(task.id) == completed_task
+        assert unit_of_work.study_progress.get(progress.id) == mastered_progress
 
 
 def test_uncommitted_unit_of_work_is_rolled_back(

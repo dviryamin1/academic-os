@@ -25,6 +25,9 @@ class SqlAlchemyRepository(Generic[DomainT, ModelT]):
     def add(self, entity: DomainT) -> None:
         self._session.add(self._mapper.to_model(entity))
 
+    def update(self, entity: DomainT) -> None:
+        self._session.merge(self._mapper.to_model(entity))
+
     def get(self, entity_id: UUID) -> DomainT | None:
         model = self._session.get(self._mapper.model_type, entity_id)
         return None if model is None else self._mapper.to_domain(model)
@@ -41,4 +44,3 @@ class SqlAlchemyRepository(Generic[DomainT, ModelT]):
 
         self._session.delete(model)
         return True
-

@@ -10,6 +10,9 @@ class Repository(Protocol[EntityT]):
     def add(self, entity: EntityT) -> None:
         ...
 
+    def update(self, entity: EntityT) -> None:
+        ...
+
     def get(self, entity_id: UUID) -> EntityT | None:
         ...
 
@@ -18,4 +21,3 @@ class Repository(Protocol[EntityT]):
 
     def remove(self, entity_id: UUID) -> bool:
         ...
-

@@ -5,6 +5,9 @@ from academic_os.infrastructure.persistence.sqlalchemy.database import (
     create_session_factory,
     get_database_url,
 )
+from academic_os.infrastructure.persistence.sqlalchemy.migrations import (
+    upgrade_database,
+)
 from academic_os.infrastructure.persistence.sqlalchemy.unit_of_work import (
     SqlAlchemyUnitOfWork,
 )
@@ -14,5 +17,5 @@ __all__ = [
     "create_database_engine",
     "create_session_factory",
     "get_database_url",
+    "upgrade_database",
 ]
-

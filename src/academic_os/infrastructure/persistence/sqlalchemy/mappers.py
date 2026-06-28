@@ -146,20 +146,24 @@ CURRICULUM_ITEM_MAPPER = EntityMapper(
     model_type=CurriculumItemModel,
     to_model=lambda entity: CurriculumItemModel(
         id=entity.id,
+        code=entity.code,
         parent_id=entity.parent_id,
         title=entity.title,
         item_type=entity.item_type.code,
         course_id=entity.course_id,
         source=entity.source,
+        pages=entity.pages,
         order=entity.order,
     ),
     to_domain=lambda model: CurriculumItem(
         id=model.id,
+        code=model.code,
         parent_id=model.parent_id,
         title=model.title,
         item_type=CurriculumItemType(model.item_type),
         course_id=model.course_id,
         source=model.source,
+        pages=model.pages,
         order=model.order,
     ),
 )
@@ -303,4 +307,3 @@ EXAM_MAPPER = EntityMapper(
         starts_at=model.starts_at,
     ),
 )
-

@@ -76,11 +76,13 @@ class DomainModelTests(TestCase):
         for order in range(100):
             item = CurriculumItem(
                 id=uuid4(),
+                code=f"TOPIC-{order}",
                 parent_id=parent_id,
                 title=f"Level {order}",
                 item_type=CurriculumItemType(CurriculumItemType.TOPIC),
                 course_id=course_id,
                 source=None,
+                pages=None,
                 order=order,
             )
             parent_id = item.id

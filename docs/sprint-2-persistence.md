@@ -73,11 +73,13 @@ erDiagram
     }
     CURRICULUM_ITEMS {
         uuid id PK
+        string code
         uuid parent_id FK
         uuid course_id FK
         string title
         string item_type
         string source
+        string pages
         int order
     }
     STUDY_PLANS {
@@ -158,9 +160,10 @@ persistence boundary.
 
 ## 3. Repository overview
 
-`Repository[T]` is an application-layer port with four persistence operations:
+`Repository[T]` is an application-layer port with five persistence operations:
 
 - `add(entity)`
+- `update(entity)`
 - `get(entity_id)`
 - `list_all()`
 - `remove(entity_id)`
@@ -182,8 +185,9 @@ for every approved domain entity.
 ## 4. Alembic migration summary
 
 Revision `0001` creates all 16 approved entity tables, their primary keys,
-foreign keys, relationship indexes, and approved uniqueness constraints. It
-contains no seed data or inserts.
+foreign keys, relationship indexes, and approved uniqueness constraints.
+Revision `0002` adds the approved human-readable curriculum item code and
+optional pages fields. Neither migration contains seed curriculum data.
 
 Alembic uses the same `ACADEMIC_OS_DATABASE_URL` configuration as normal session
 creation. The default is `sqlite:///academic_os.db`; another SQLAlchemy URL can
@@ -194,7 +198,7 @@ against the ORM metadata with Alembic's schema-drift check.
 
 ## 5. Testing summary
 
-The complete suite contains 13 passing tests. Persistence coverage verifies:
+The Sprint 2B suite contains 20 passing tests. Persistence coverage verifies:
 
 - round-trip persistence for every approved domain entity;
 - domain value-object conversion;
