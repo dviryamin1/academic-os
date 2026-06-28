@@ -5,14 +5,18 @@ items.
 
 ## Local CLI setup
 
-From PowerShell in the project directory:
+For complete fresh-Windows setup instructions using `uv`, see
+[docs/windows-uv-setup.md](docs/windows-uv-setup.md).
+
+From PowerShell in an existing clone:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
-academic-os init-db
-academic-os import-curriculum .\course_catalog_hebrew_values.json
-academic-os list-courses
+uv python install 3.12
+uv venv --python 3.12
+uv sync
+uv run academic-os init-db
+uv run academic-os import-curriculum .\course_catalog_hebrew_values.json
+uv run academic-os list-courses
 ```
 
 The import command defaults to:
@@ -40,5 +44,5 @@ academic-os log-session STAT-10.8 --minutes 30
 academic-os set-progress STAT-10.8 in_progress
 ```
 
-Use `academic-os --help` or `academic-os COMMAND --help` for command details.
-
+Use `uv run academic-os --help` or
+`uv run academic-os COMMAND --help` for command details.
