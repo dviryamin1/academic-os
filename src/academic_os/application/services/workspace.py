@@ -36,9 +36,14 @@ DEFAULT_TASK_DEFINITIONS = (
     (StudyTaskType.PRACTICE, "Practice"),
     (StudyTaskType.REVIEW, "Review"),
 )
+TASK_ORDER = {
+    task_type: position
+    for position, (task_type, _) in enumerate(DEFAULT_TASK_DEFINITIONS)
+}
 
 UnitOfWorkFactory = Callable[[], UnitOfWork]
 Clock = Callable[[], datetime]
+DatabaseInitializer = Callable[[], None]
 EntityT = TypeVar("EntityT")
 
 
@@ -61,6 +66,8 @@ class ItemWorkspace:
     parent: CurriculumItem | None
     children: tuple[CurriculumItem, ...]
     tasks: tuple[StudyTask, ...]
+    notes: tuple[Note, ...]
+    study_sessions: tuple[StudySession, ...]
     progress: StudyProgress | None
 
 
@@ -73,10 +80,17 @@ class WorkspaceService:
         curriculum_importer: CurriculumImporter[Path],
         *,
         clock: Clock = datetime.now,
+        database_initializer: DatabaseInitializer | None = None,
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._curriculum_importer = curriculum_importer
         self._clock = clock
+        self._database_initializer = database_initializer
+
+    def initialize_database(self) -> None:
+        if self._database_initializer is None:
+            raise WorkspaceError("Database initialization is not configured")
+        self._database_initializer()
 
     def import_curriculum(
         self,
@@ -179,9 +193,39 @@ class WorkspaceService:
                 )
             )
             tasks = tuple(
-                task
-                for task in unit_of_work.study_tasks.list_all()
-                if task.curriculum_item_id == item.id
+                sorted(
+                    (
+                        task
+                        for task in unit_of_work.study_tasks.list_all()
+                        if task.curriculum_item_id == item.id
+                    ),
+                    key=lambda task: TASK_ORDER.get(
+                        task.task_type.code,
+                        len(TASK_ORDER),
+                    ),
+                )
+            )
+            notes = tuple(
+                sorted(
+                    (
+                        note
+                        for note in unit_of_work.notes.list_all()
+                        if note.curriculum_item_id == item.id
+                    ),
+                    key=lambda note: note.created_at,
+                    reverse=True,
+                )
+            )
+            study_sessions = tuple(
+                sorted(
+                    (
+                        session
+                        for session in unit_of_work.study_sessions.list_all()
+                        if session.curriculum_item_id == item.id
+                    ),
+                    key=lambda session: session.started_at,
+                    reverse=True,
+                )
             )
             progress = next(
                 (
@@ -198,6 +242,8 @@ class WorkspaceService:
             parent=parent,
             children=children,
             tasks=tasks,
+            notes=notes,
+            study_sessions=study_sessions,
             progress=progress,
         )
 

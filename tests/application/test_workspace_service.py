@@ -185,6 +185,26 @@ def test_note_session_and_progress_workflow(
         )
         assert unit_of_work.study_progress.get(mastered.id) == mastered
 
+    workspace = service.show_item("STAT-10.8")
+    assert workspace.notes == (note,)
+    assert workspace.study_sessions == (study_session,)
+    assert workspace.progress == mastered
+
+
+def test_database_initialization_uses_injected_operation(
+    session_factory: SessionFactory,
+) -> None:
+    initialization_calls: list[str] = []
+    service = WorkspaceService(
+        lambda: SqlAlchemyUnitOfWork(session_factory),
+        JsonCurriculumImporter(),
+        database_initializer=lambda: initialization_calls.append("called"),
+    )
+
+    service.initialize_database()
+
+    assert initialization_calls == ["called"]
+
 
 def _import(service: WorkspaceService, curriculum_file) -> None:
     service.import_curriculum(
