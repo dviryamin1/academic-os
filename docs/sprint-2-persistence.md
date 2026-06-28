@@ -194,7 +194,7 @@ against the ORM metadata with Alembic's schema-drift check.
 
 ## 5. Testing summary
 
-The complete suite contains 12 passing tests. Persistence coverage verifies:
+The complete suite contains 13 passing tests. Persistence coverage verifies:
 
 - round-trip persistence for every approved domain entity;
 - domain value-object conversion;
@@ -205,6 +205,11 @@ The complete suite contains 12 passing tests. Persistence coverage verifies:
 - initial migration creation and ORM schema consistency;
 - continued domain independence from SQLAlchemy, Alembic, SQLite, and
   infrastructure modules.
+
+The Event persistence regression test covers both a nullable `ends_at` value and
+a concrete end time. `Event`, `EventModel`, `EVENT_MAPPER`, and migration `0001`
+all represent this field consistently. Alembic's schema-drift check protects
+this model/migration parity.
 
 Every persistence test uses a fresh SQLite database inside pytest's isolated
 temporary workspace. The default application database is never created or used.

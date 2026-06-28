@@ -212,6 +212,37 @@ def test_repository_lists_and_removes_entities(
         assert unit_of_work.institutions.get(second.id) == second
 
 
+def test_event_round_trip_preserves_optional_end_time(
+    session_factory: SessionFactory,
+) -> None:
+    event_without_end = Event(
+        id=uuid4(),
+        title="Open-ended event",
+        starts_at=datetime(2026, 11, 1, 9, 0),
+        ends_at=None,
+    )
+    event_with_end = Event(
+        id=uuid4(),
+        title="Fixed-duration event",
+        starts_at=datetime(2026, 11, 2, 9, 0),
+        ends_at=datetime(2026, 11, 2, 11, 30),
+    )
+
+    with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
+        unit_of_work.events.add(event_without_end)
+        unit_of_work.events.add(event_with_end)
+        unit_of_work.commit()
+
+    with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
+        loaded_without_end = unit_of_work.events.get(event_without_end.id)
+        loaded_with_end = unit_of_work.events.get(event_with_end.id)
+
+        assert loaded_without_end == event_without_end
+        assert loaded_without_end.ends_at is None
+        assert loaded_with_end == event_with_end
+        assert loaded_with_end.ends_at == event_with_end.ends_at
+
+
 def test_uncommitted_unit_of_work_is_rolled_back(
     session_factory: SessionFactory,
 ) -> None:
@@ -248,4 +279,3 @@ def _assert_orm_relationships(
         assert len(course.assignments) == 1
         assert len(course.exams) == 1
         assert len(study_plan.items) == 1
-
