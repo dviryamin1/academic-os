@@ -7,7 +7,10 @@ name = "academic-os"
 version = "0.1.0"
 description = "A long-term operating system for academic degree management."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.13,<2",
+    "SQLAlchemy>=2.0,<3",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
@@ -16,7 +19,6 @@ test = ["pytest>=8.0"]
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --basetemp=.pytest-tmp"
 testpaths = ["tests"]
 pythonpath = ["src"]
-
