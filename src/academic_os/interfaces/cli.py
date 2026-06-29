@@ -6,7 +6,11 @@ from uuid import UUID
 
 from sqlalchemy.exc import OperationalError
 
-from academic_os.application.services import WorkspaceError, WorkspaceService
+from academic_os.application.services import (
+    StudyWorkflowService,
+    WorkspaceError,
+    WorkspaceService,
+)
 from academic_os.domain import StudyProgressStatus
 from academic_os.infrastructure.importers import JsonCurriculumImporter
 from academic_os.infrastructure.persistence.sqlalchemy import (
@@ -36,11 +40,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         engine = create_database_engine(database_url)
         try:
             session_factory = create_session_factory(engine)
+            unit_of_work_factory = lambda: SqlAlchemyUnitOfWork(session_factory)
             service = WorkspaceService(
-                lambda: SqlAlchemyUnitOfWork(session_factory),
+                unit_of_work_factory,
                 JsonCurriculumImporter(),
             )
-            return _run_command(arguments, service)
+            workflow_service = StudyWorkflowService(unit_of_work_factory)
+            return _run_command(arguments, service, workflow_service)
         finally:
             engine.dispose()
     except (WorkspaceError, ValueError, OSError) as error:
@@ -57,6 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _run_command(
     arguments: argparse.Namespace,
     service: WorkspaceService,
+    workflow_service: StudyWorkflowService,
 ) -> int:
     if arguments.command == "import-curriculum":
         summary = service.import_curriculum(
@@ -171,6 +178,80 @@ def _run_command(
         )
         return 0
 
+    if arguments.command == "resume":
+        resume = workflow_service.resume_learning()
+        if resume is None:
+            print("No study activity found.")
+            return 0
+        print(f"[{resume.item.code}] {resume.item.title}")
+        print(f"Course: {resume.course.title}")
+        print(f"Pages: {resume.item.pages or '-'}")
+        print(f"Last activity: {resume.last_activity_at:%Y-%m-%d %H:%M}")
+        print(
+            "Last session: "
+            + (
+                f"{resume.last_session_duration_minutes} minutes"
+                if resume.last_session_duration_minutes is not None
+                else "-"
+            )
+        )
+        print(f"Progress: {resume.progress_status.code}")
+        print(f"Open tasks: {len(resume.open_tasks)}")
+        for task in resume.open_tasks:
+            print(f"  {task.id}\t{task.task_type.code}\t{task.title}")
+        print(f"Next: academic-os show-item {resume.item.code}")
+        return 0
+
+    if arguments.command == "next":
+        recommendation = workflow_service.recommend_next()
+        if recommendation is None:
+            print("No open study tasks found.")
+            return 0
+        print(f"Task: {recommendation.task.title}")
+        print(f"Task ID: {recommendation.task.id}")
+        print(f"Type: {recommendation.task.task_type.code}")
+        print(
+            f"Item: [{recommendation.item.code}] "
+            f"{recommendation.item.title}"
+        )
+        print(f"Course: {recommendation.course.title}")
+        print(f"Pages: {recommendation.item.pages or '-'}")
+        print(f"Reason: {recommendation.reason}")
+        print(f"Next: academic-os show-item {recommendation.item.code}")
+        return 0
+
+    if arguments.command == "open-tasks":
+        open_tasks = workflow_service.list_open_tasks(arguments.course)
+        if not open_tasks:
+            print("No open study tasks found.")
+            return 0
+        for result in open_tasks:
+            print(
+                f"{result.course.title}\t{result.item.code}\t"
+                f"{result.item.title}\t{result.task.task_type.code}\t"
+                f"{result.task.title}\t{result.task.id}"
+            )
+        return 0
+
+    if arguments.command == "progress-summary":
+        summaries = workflow_service.progress_summary()
+        if not summaries:
+            print("No courses found.")
+            return 0
+        print(
+            "Course\tItems\tNot started\tIn progress\tMastered\t"
+            "Open tasks\tCompleted tasks\tStudy minutes"
+        )
+        for summary in summaries:
+            print(
+                f"{summary.course.title}\t{summary.total_items}\t"
+                f"{summary.not_started_items}\t"
+                f"{summary.in_progress_items}\t{summary.mastered_items}\t"
+                f"{summary.open_tasks}\t{summary.completed_tasks}\t"
+                f"{summary.total_study_minutes}"
+            )
+        return 0
+
     raise WorkspaceError(f"Unknown command: {arguments.command}")
 
 
@@ -250,6 +331,27 @@ def _build_parser() -> argparse.ArgumentParser:
             StudyProgressStatus.IN_PROGRESS,
             StudyProgressStatus.MASTERED,
         ],
+    )
+
+    commands.add_parser(
+        "resume",
+        help="Show the curriculum item with the latest study activity.",
+    )
+    commands.add_parser(
+        "next",
+        help="Recommend the next open study task.",
+    )
+    open_tasks_parser = commands.add_parser(
+        "open-tasks",
+        help="List incomplete study tasks.",
+    )
+    open_tasks_parser.add_argument(
+        "--course",
+        help="Filter by exact course code or title.",
+    )
+    commands.add_parser(
+        "progress-summary",
+        help="Show count-based progress and study time by course.",
     )
 
     return parser

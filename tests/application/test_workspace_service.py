@@ -176,6 +176,8 @@ def test_note_session_and_progress_workflow(
     assert study_session.started_at == datetime(2026, 11, 15, 11, 30)
     assert mastered.id == progress.id
     assert mastered.status.code == StudyProgressStatus.MASTERED
+    assert progress.status_updated_at == FIXED_NOW
+    assert mastered.status_updated_at == FIXED_NOW
 
     with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
         assert unit_of_work.notes.get(note.id) == note
@@ -189,6 +191,37 @@ def test_note_session_and_progress_workflow(
     assert workspace.notes == (note,)
     assert workspace.study_sessions == (study_session,)
     assert workspace.progress == mastered
+
+
+def test_progress_update_refreshes_status_timestamp(
+    session_factory: SessionFactory,
+    curriculum_file,
+) -> None:
+    timestamps = iter(
+        [
+            datetime(2026, 11, 15, 12, 0),
+            datetime(2026, 11, 15, 12, 5),
+        ]
+    )
+    timestamped_service = WorkspaceService(
+        lambda: SqlAlchemyUnitOfWork(session_factory),
+        JsonCurriculumImporter(),
+        clock=lambda: next(timestamps),
+    )
+    _import(timestamped_service, curriculum_file)
+
+    created = timestamped_service.set_progress(
+        "STAT-10.8",
+        StudyProgressStatus.IN_PROGRESS,
+    )
+    updated = timestamped_service.set_progress(
+        "STAT-10.8",
+        StudyProgressStatus.MASTERED,
+    )
+
+    assert created.status_updated_at == datetime(2026, 11, 15, 12, 0)
+    assert updated.status_updated_at == datetime(2026, 11, 15, 12, 5)
+    assert updated.status_updated_at > created.status_updated_at
 
 
 def test_database_initialization_uses_injected_operation(

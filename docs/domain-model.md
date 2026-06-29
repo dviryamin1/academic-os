@@ -77,8 +77,10 @@ owned exclusively by `CurriculumItem`.
 
 `StudyProgress` independently references `CurriculumItem` and contains a
 `StudyProgressStatus`. Progress is no longer implicitly represented only by
-`StudyTask.completed_at`, and no mutable progress field was added to immutable
-curriculum data.
+`StudyTask.completed_at`. Its `status_updated_at` timestamp records when the
+status was last set so resume behavior remains deterministic without a study
+session. No completion percentage or mutable progress field was added to
+immutable curriculum data.
 
 ### 6. StudyTask gained typed terminology
 

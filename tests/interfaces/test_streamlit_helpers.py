@@ -5,13 +5,15 @@ from uuid import UUID, uuid4
 
 from streamlit.testing.v1 import AppTest
 
-from academic_os.domain import CurriculumItem, CurriculumItemType
+from academic_os.application.services import CourseProgressSummary
+from academic_os.domain import Course, CurriculumItem, CurriculumItemType
 from academic_os.interfaces.streamlit_app import (
     FIRST_STRONG_ISOLATE,
     LEFT_TO_RIGHT_ISOLATE,
     POP_DIRECTIONAL_ISOLATE,
     _descendant_items,
     _local_item_code,
+    _progress_summary_rows,
     _resolve_navigation_target,
     _safe_item_label,
     _session_duration_minutes,
@@ -84,6 +86,38 @@ def test_local_codes_and_bidi_labels_preserve_internal_values() -> None:
         f"{FIRST_STRONG_ISOLATE}{item.title}{POP_DIRECTIONAL_ISOLATE}"
         in label
     )
+
+
+def test_progress_summary_rows_are_ready_for_streamlit_table() -> None:
+    course = Course(
+        id=uuid4(),
+        institution_id=uuid4(),
+        code="STAT",
+        title="סטטיסטיקה ב'",
+    )
+    summary = CourseProgressSummary(
+        course=course,
+        total_items=10,
+        not_started_items=4,
+        in_progress_items=3,
+        mastered_items=3,
+        open_tasks=5,
+        completed_tasks=7,
+        total_study_minutes=125,
+    )
+
+    assert _progress_summary_rows([summary]) == [
+        {
+            "Course": "סטטיסטיקה ב'",
+            "Items": 10,
+            "Not started": 4,
+            "In progress": 3,
+            "Mastered": 3,
+            "Open tasks": 5,
+            "Completed tasks": 7,
+            "Study minutes": 125,
+        }
+    ]
 
 
 def test_streamlit_app_starts_before_database_initialization(

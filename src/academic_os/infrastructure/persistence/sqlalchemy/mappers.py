@@ -236,11 +236,13 @@ STUDY_PROGRESS_MAPPER = EntityMapper(
         id=entity.id,
         curriculum_item_id=entity.curriculum_item_id,
         status=entity.status.code,
+        status_updated_at=entity.status_updated_at,
     ),
     to_domain=lambda model: StudyProgress(
         id=model.id,
         curriculum_item_id=model.curriculum_item_id,
         status=StudyProgressStatus(model.status),
+        status_updated_at=model.status_updated_at,
     ),
 )
 

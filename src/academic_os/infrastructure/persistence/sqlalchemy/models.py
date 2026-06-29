@@ -248,6 +248,7 @@ class StudyProgressModel(Base):
         unique=True,
     )
     status: Mapped[str] = mapped_column(String)
+    status_updated_at: Mapped[datetime] = mapped_column(DateTime)
 
     curriculum_item: Mapped[CurriculumItemModel] = relationship(
         back_populates="study_progress"

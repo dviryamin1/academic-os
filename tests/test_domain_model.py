@@ -1,5 +1,5 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest import TestCase
 from uuid import uuid4
@@ -109,6 +109,7 @@ class DomainModelTests(TestCase):
             id=uuid4(),
             curriculum_item_id=curriculum_item_id,
             status=StudyProgressStatus(StudyProgressStatus.IN_PROGRESS),
+            status_updated_at=datetime(2026, 11, 15, 12, 0),
         )
         task = StudyTask(
             id=uuid4(),

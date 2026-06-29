@@ -362,12 +362,14 @@ class WorkspaceService:
                     id=_stable_uuid("study-progress", str(item.id)),
                     curriculum_item_id=item.id,
                     status=StudyProgressStatus(status),
+                    status_updated_at=self._clock(),
                 )
                 unit_of_work.study_progress.add(progress)
             else:
                 progress = replace(
                     progress,
                     status=StudyProgressStatus(status),
+                    status_updated_at=self._clock(),
                 )
                 unit_of_work.study_progress.update(progress)
             unit_of_work.commit()

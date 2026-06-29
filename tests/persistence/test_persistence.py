@@ -118,6 +118,7 @@ def test_complete_domain_graph_can_be_persisted(
         id=uuid4(),
         curriculum_item_id=topic.id,
         status=StudyProgressStatus(StudyProgressStatus.IN_PROGRESS),
+        status_updated_at=datetime(2026, 10, 20, 11, 5),
     )
     event = Event(
         id=uuid4(),
@@ -281,6 +282,7 @@ def test_repository_updates_immutable_task_and_progress(
         id=uuid4(),
         curriculum_item_id=curriculum_item.id,
         status=StudyProgressStatus(StudyProgressStatus.NOT_STARTED),
+        status_updated_at=datetime(2026, 11, 3, 10, 0),
     )
 
     with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:
@@ -296,6 +298,7 @@ def test_repository_updates_immutable_task_and_progress(
     mastered_progress = replace(
         progress,
         status=StudyProgressStatus(StudyProgressStatus.MASTERED),
+        status_updated_at=datetime(2026, 11, 3, 12, 0),
     )
 
     with SqlAlchemyUnitOfWork(session_factory) as unit_of_work:

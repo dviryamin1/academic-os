@@ -9,13 +9,16 @@ import streamlit as st
 from sqlalchemy.exc import OperationalError
 
 from academic_os.application.services import (
+    CourseProgressSummary,
     ItemWorkspace,
+    StudyWorkflowService,
     WorkspaceError,
     WorkspaceService,
 )
 from academic_os.domain import StudyProgressStatus
 from academic_os.domain import CurriculumItem
 from academic_os.interfaces.streamlit_bootstrap import (
+    build_study_workflow_service,
     build_workspace_service,
     default_database_url,
 )
@@ -35,6 +38,11 @@ POP_DIRECTIONAL_ISOLATE = "\u2069"
 @st.cache_resource
 def _build_service(database_url: str) -> WorkspaceService:
     return build_workspace_service(database_url)
+
+
+@st.cache_resource
+def _build_workflow_service(database_url: str) -> StudyWorkflowService:
+    return build_study_workflow_service(database_url)
 
 
 def run() -> None:
@@ -66,6 +74,9 @@ def run() -> None:
             "sidebar to begin."
         )
         return
+
+    workflow_service = _build_workflow_service(database_url)
+    _render_daily_workflow(workflow_service)
 
     st.subheader("Choose what to study")
     courses_by_id = {str(course.id): course for course in courses}
@@ -146,6 +157,88 @@ def run() -> None:
     st.divider()
     workspace = service.show_item(selected_item.code)
     _render_item_workspace(service, workspace)
+
+
+def _render_daily_workflow(service: StudyWorkflowService) -> None:
+    st.subheader("Today")
+    resume = service.resume_learning()
+    recommendation = service.recommend_next()
+
+    resume_column, next_column = st.columns(2)
+    with resume_column:
+        with st.container(border=True):
+            st.markdown("#### Resume learning")
+            if resume is None:
+                st.caption("No study activity yet.")
+            else:
+                _render_code(resume.item.code)
+                _render_bidi_value(resume.item.title)
+                st.caption(
+                    f"{resume.course.title} · "
+                    f"{resume.last_activity_at:%Y-%m-%d %H:%M} · "
+                    f"{len(resume.open_tasks)} open tasks"
+                )
+                if st.button(
+                    "Open resume item",
+                    key="open-resume-item",
+                    use_container_width=True,
+                ):
+                    _activate_item(resume.item)
+
+    with next_column:
+        with st.container(border=True):
+            st.markdown("#### Recommended next task")
+            if recommendation is None:
+                st.caption("No open study tasks.")
+            else:
+                st.write(
+                    f"**{recommendation.task.title}** · "
+                    f"{recommendation.task.task_type.code}"
+                )
+                _render_code(recommendation.item.code)
+                _render_bidi_value(recommendation.item.title)
+                st.caption(recommendation.reason)
+                if st.button(
+                    "Open recommended item",
+                    key="open-recommended-item",
+                    use_container_width=True,
+                ):
+                    _activate_item(recommendation.item)
+
+    with st.expander("Open Tasks", expanded=False):
+        open_tasks = service.list_open_tasks()
+        if not open_tasks:
+            st.caption("No open study tasks.")
+        for index, result in enumerate(open_tasks):
+            details_column, action_column = st.columns([5, 1])
+            with details_column:
+                st.write(
+                    f"**{result.task.title}** · {result.task.task_type.code}"
+                )
+                st.caption(
+                    f"{result.course.title} · {result.item.code} · "
+                    f"{result.item.title}"
+                )
+            with action_column:
+                if st.button(
+                    "Open",
+                    key=f"open-task-item-{index}-{result.task.id}",
+                    use_container_width=True,
+                ):
+                    _activate_item(result.item)
+
+    st.markdown("#### Course progress")
+    summaries = service.progress_summary()
+    if summaries:
+        st.dataframe(
+            _progress_summary_rows(summaries),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.caption("No courses found.")
+
+    st.divider()
 
 
 def _render_setup_sidebar() -> tuple[str, WorkspaceService]:
@@ -549,6 +642,30 @@ def _render_item_reference(
             st.rerun()
     with title_column:
         _render_bidi_value(item.title)
+
+
+def _activate_item(item: CurriculumItem) -> None:
+    st.session_state["navigation-course-id"] = str(item.course_id)
+    st.session_state["_pending-navigation-code"] = item.code
+    st.rerun()
+
+
+def _progress_summary_rows(
+    summaries: list[CourseProgressSummary],
+) -> list[dict[str, str | int]]:
+    return [
+        {
+            "Course": summary.course.title,
+            "Items": summary.total_items,
+            "Not started": summary.not_started_items,
+            "In progress": summary.in_progress_items,
+            "Mastered": summary.mastered_items,
+            "Open tasks": summary.open_tasks,
+            "Completed tasks": summary.completed_tasks,
+            "Study minutes": summary.total_study_minutes,
+        }
+        for summary in summaries
+    ]
 
 
 def _flash_and_rerun(message: str) -> None:

@@ -61,6 +61,11 @@ uv run academic-os complete-task TASK_UUID
 uv run academic-os add-note STAT-10.8 "הערה"
 uv run academic-os log-session STAT-10.8 --minutes 30
 uv run academic-os set-progress STAT-10.8 in_progress
+uv run academic-os resume
+uv run academic-os next
+uv run academic-os open-tasks
+uv run academic-os open-tasks --course "סטטיסטיקה ב'"
+uv run academic-os progress-summary
 ```
 
 Use `uv run academic-os --help` for the complete command reference.
@@ -81,10 +86,15 @@ From the interface:
 1. Initialize the database from the sidebar.
 2. Upload and import the curriculum JSON.
 3. Select a course and curriculum item.
-4. Work through tasks, notes, study history, and progress.
+4. Use the Today area to resume learning or open the recommended task.
+5. Review open tasks and course progress.
+6. Work through tasks, notes, study history, and progress.
 
 The Streamlit interface and CLI use the same Application Services and database.
 The GUI does not access repositories directly.
+
+For the Sprint 3 rules and limitations, see
+[docs/sprint-3-daily-study-workflow.md](docs/sprint-3-daily-study-workflow.md).
 
 ## Dogfooding
 

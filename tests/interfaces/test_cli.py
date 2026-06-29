@@ -148,3 +148,39 @@ def test_cli_import_list_and_show_workflow(
     updated_output = capsys.readouterr().out
     assert "Progress: in_progress" in updated_output
     assert "[done] reading: Reading" in updated_output
+
+    assert main(["--database-url", database_url, "resume"]) == 0
+    resume_output = capsys.readouterr().out
+    assert "[DP-01]" in resume_output
+    assert "Last session: 30 minutes" in resume_output
+    assert "Progress: in_progress" in resume_output
+
+    assert main(["--database-url", database_url, "next"]) == 0
+    next_output = capsys.readouterr().out
+    assert "Task: Summary" in next_output
+    assert "Type: summary" in next_output
+    assert "Continue the item you studied most recently." in next_output
+
+    assert main(["--database-url", database_url, "open-tasks"]) == 0
+    open_tasks_output = capsys.readouterr().out
+    assert "summary\tSummary" in open_tasks_output
+    assert "reading\tReading" not in open_tasks_output
+
+    assert (
+        main(
+            [
+                "--database-url",
+                database_url,
+                "open-tasks",
+                "--course",
+                "DP",
+            ]
+        )
+        == 0
+    )
+    assert "summary\tSummary" in capsys.readouterr().out
+
+    assert main(["--database-url", database_url, "progress-summary"]) == 0
+    summary_output = capsys.readouterr().out
+    assert "Study minutes" in summary_output
+    assert "\t1\t0\t1\t0\t3\t1\t30" in summary_output
