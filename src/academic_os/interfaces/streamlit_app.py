@@ -1,7 +1,9 @@
+from html import escape
 from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from uuid import UUID
 
 import streamlit as st
 from sqlalchemy.exc import OperationalError
@@ -12,6 +14,7 @@ from academic_os.application.services import (
     WorkspaceService,
 )
 from academic_os.domain import StudyProgressStatus
+from academic_os.domain import CurriculumItem
 from academic_os.interfaces.streamlit_bootstrap import (
     build_workspace_service,
     default_database_url,
@@ -24,6 +27,9 @@ PROGRESS_STATUSES = (
     StudyProgressStatus.IN_PROGRESS,
     StudyProgressStatus.MASTERED,
 )
+LEFT_TO_RIGHT_ISOLATE = "\u2066"
+FIRST_STRONG_ISOLATE = "\u2068"
+POP_DIRECTIONAL_ISOLATE = "\u2069"
 
 
 @st.cache_resource
@@ -62,18 +68,80 @@ def run() -> None:
         return
 
     st.subheader("Choose what to study")
-    selected_course = st.selectbox(
+    courses_by_id = {str(course.id): course for course in courses}
+    course_ids = list(courses_by_id)
+    if st.session_state.get("navigation-course-id") not in course_ids:
+        st.session_state["navigation-course-id"] = course_ids[0]
+    selected_course_id = st.selectbox(
         "Course",
-        options=courses,
-        format_func=lambda course: course.title,
+        options=course_ids,
+        format_func=lambda course_id: courses_by_id[course_id].title,
+        key="navigation-course-id",
     )
+    selected_course = courses_by_id[selected_course_id]
+    if st.session_state.get("_active-navigation-course-id") != selected_course_id:
+        st.session_state["_active-navigation-course-id"] = selected_course_id
+        st.session_state.pop("navigation-top-level-id", None)
+        st.session_state.pop("navigation-child-id", None)
+
     items = service.list_curriculum_items(selected_course.code)
-    selected_item = st.selectbox(
-        "Curriculum item",
-        options=items,
-        format_func=lambda item: f"{item.code} · {item.title}",
+    items_by_id = {str(item.id): item for item in items}
+    top_level_items = _top_level_items(items)
+    top_level_ids = [str(item.id) for item in top_level_items]
+    if not top_level_ids:
+        st.warning("This course has no top-level curriculum items.")
+        return
+
+    pending_code = st.session_state.pop("_pending-navigation-code", None)
+    if pending_code is not None:
+        parent, child = _resolve_navigation_target(items, pending_code)
+        st.session_state["navigation-top-level-id"] = str(parent.id)
+        st.session_state["navigation-child-id"] = (
+            str(child.id) if child is not None else None
+        )
+
+    if st.session_state.get("navigation-top-level-id") not in top_level_ids:
+        st.session_state["navigation-top-level-id"] = top_level_ids[0]
+    selected_parent_id = st.selectbox(
+        "Top-level item",
+        options=top_level_ids,
+        format_func=lambda item_id: _safe_item_label(items_by_id[item_id]),
+        key="navigation-top-level-id",
     )
-    st.caption(f"{len(items)} curriculum items in this course")
+    selected_parent = items_by_id[selected_parent_id]
+
+    descendants = _descendant_items(items, selected_parent.id)
+    selected_child: CurriculumItem | None = None
+    if descendants:
+        descendant_ids = [str(item.id) for item in descendants]
+        child_options: list[str | None] = [None, *descendant_ids]
+        if st.session_state.get("navigation-child-id") not in child_options:
+            st.session_state["navigation-child-id"] = None
+        selected_child_id = st.selectbox(
+            "Child item",
+            options=child_options,
+            format_func=lambda item_id: (
+                "Use top-level item"
+                if item_id is None
+                else _isolated_code(
+                    _local_item_code(items_by_id[item_id].code)
+                )
+            ),
+            key="navigation-child-id",
+        )
+        if selected_child_id is not None:
+            selected_child = items_by_id[selected_child_id]
+            st.caption("Selected child title")
+            _render_bidi_value(selected_child.title)
+    else:
+        st.session_state.pop("navigation-child-id", None)
+        st.caption("This top-level item has no child items.")
+
+    selected_item = selected_child or selected_parent
+    st.caption(
+        f"{len(top_level_items)} top-level items · "
+        f"{len(descendants)} child items under this selection"
+    )
 
     st.divider()
     workspace = service.show_item(selected_item.code)
@@ -168,29 +236,38 @@ def _render_item_workspace(
     workspace: ItemWorkspace,
 ) -> None:
     item = workspace.item
-    st.subheader(item.title)
-    st.caption(f"{item.code} · {workspace.course.title}")
+    _render_workspace_heading(item.title)
+
+    code_column, course_column = st.columns([1, 3])
+    with code_column:
+        st.caption("Item code")
+        _render_code(item.code)
+    with course_column:
+        st.caption("Course")
+        _render_bidi_value(workspace.course.title)
 
     with st.container(border=True):
-        st.markdown(f"**Course:** {workspace.course.title}")
-        st.markdown(f"**Source:** {item.source or '—'}")
-        st.markdown(f"**Pages:** {item.pages or '—'}")
-        st.markdown(
-            "**Parent:** "
-            + (
-                f"{workspace.parent.code} — {workspace.parent.title}"
-                if workspace.parent
-                else "Root item"
-            )
-        )
+        source_column, pages_column = st.columns(2)
+        with source_column:
+            st.caption("Source")
+            _render_bidi_value(item.source or "—")
+        with pages_column:
+            st.caption("Pages")
+            _render_code(item.pages or "—")
+
+        st.caption("Parent")
+        if workspace.parent is None:
+            st.write("Root item")
+        else:
+            _render_item_reference(workspace.parent, key_prefix="parent")
 
     if workspace.children:
         with st.expander(
             f"Child items ({len(workspace.children)})",
-            expanded=False,
+            expanded=True,
         ):
             for child in workspace.children:
-                st.write(f"**{child.code}** — {child.title}")
+                _render_item_reference(child, key_prefix="child")
 
     active_section = st.radio(
         "Workspace section",
@@ -357,6 +434,123 @@ def _session_duration_minutes(
     return max(0, round((ended_at - started_at).total_seconds() / 60))
 
 
+def _top_level_items(
+    items: list[CurriculumItem],
+) -> tuple[CurriculumItem, ...]:
+    return tuple(
+        sorted(
+            (item for item in items if item.parent_id is None),
+            key=lambda item: (item.order, item.code.casefold()),
+        )
+    )
+
+
+def _descendant_items(
+    items: list[CurriculumItem],
+    parent_id: UUID,
+) -> tuple[CurriculumItem, ...]:
+    children_by_parent: dict[UUID, list[CurriculumItem]] = {}
+    for item in items:
+        if item.parent_id is not None:
+            children_by_parent.setdefault(item.parent_id, []).append(item)
+    for children in children_by_parent.values():
+        children.sort(key=lambda item: (item.order, item.code.casefold()))
+
+    descendants: list[CurriculumItem] = []
+
+    def append_children(current_parent_id: UUID) -> None:
+        for child in children_by_parent.get(current_parent_id, []):
+            descendants.append(child)
+            append_children(child.id)
+
+    append_children(parent_id)
+    return tuple(descendants)
+
+
+def _resolve_navigation_target(
+    items: list[CurriculumItem],
+    target_code: str,
+) -> tuple[CurriculumItem, CurriculumItem | None]:
+    items_by_id = {item.id: item for item in items}
+    target = next(
+        (item for item in items if item.code == target_code),
+        None,
+    )
+    if target is None:
+        raise WorkspaceError(f"Curriculum item '{target_code}' was not found")
+
+    root = target
+    visited: set[UUID] = set()
+    while root.parent_id is not None:
+        if root.id in visited:
+            raise WorkspaceError("Curriculum hierarchy contains a cycle")
+        visited.add(root.id)
+        parent = items_by_id.get(root.parent_id)
+        if parent is None:
+            raise WorkspaceError(
+                f"Parent for curriculum item '{root.code}' was not found"
+            )
+        root = parent
+    return root, None if root.id == target.id else target
+
+
+def _local_item_code(code: str) -> str:
+    _, separator, local_code = code.partition("-")
+    return local_code if separator else code
+
+
+def _safe_item_label(item: CurriculumItem) -> str:
+    return (
+        f"{_isolated_code(item.code)}  ·  "
+        f"{FIRST_STRONG_ISOLATE}{item.title}{POP_DIRECTIONAL_ISOLATE}"
+    )
+
+
+def _isolated_code(code: str) -> str:
+    return (
+        f"{LEFT_TO_RIGHT_ISOLATE}{code}{POP_DIRECTIONAL_ISOLATE}"
+    )
+
+
+def _render_code(code: str) -> None:
+    st.markdown(
+        f'<span class="item-code" dir="ltr">{escape(code)}</span>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_workspace_heading(title: str) -> None:
+    st.markdown(
+        f'<h2 class="workspace-title" dir="auto">{escape(title)}</h2>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_bidi_value(value: str) -> None:
+    st.markdown(
+        f'<div class="bidi-value" dir="auto">{escape(value)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_item_reference(
+    item: CurriculumItem,
+    *,
+    key_prefix: str,
+) -> None:
+    code_column, title_column = st.columns([1, 4])
+    with code_column:
+        if st.button(
+            _isolated_code(_local_item_code(item.code)),
+            key=f"navigate-{key_prefix}-{item.id}",
+            use_container_width=True,
+        ):
+            st.session_state["_pending-navigation-code"] = item.code
+            st.rerun()
+    with title_column:
+        _render_bidi_value(item.title)
+
+
 def _flash_and_rerun(message: str) -> None:
     st.session_state["workspace_flash"] = message
     st.rerun()
@@ -373,6 +567,23 @@ def _apply_workspace_style() -> None:
         """
         <style>
         .block-container {padding-top: 2rem;}
+        .bidi-value {
+            unicode-bidi: plaintext;
+            text-align: start;
+            font-size: 1rem;
+        }
+        .workspace-title {
+            unicode-bidi: plaintext;
+            text-align: start;
+            overflow-wrap: anywhere;
+            margin: 0 0 1rem;
+        }
+        .item-code {
+            direction: ltr;
+            unicode-bidi: isolate;
+            font-family: var(--font-monospace);
+            white-space: nowrap;
+        }
         [data-testid="stMarkdownContainer"] p,
         [data-testid="stMarkdownContainer"] h3 {
             unicode-bidi: plaintext;
