@@ -83,18 +83,28 @@ automatically.
 
 From the interface:
 
-1. Initialize the database from the sidebar.
-2. Upload and import the curriculum JSON.
-3. Select a course and curriculum item.
-4. Use the Today area to resume learning or open the recommended task.
-5. Review open tasks and course progress.
-6. Work through tasks, notes, study history, and progress.
+1. Use **Initialize** for a new database or **Upgrade** for an existing one.
+2. Expand **Import curriculum** and upload the curriculum JSON.
+3. Choose a course in the sidebar.
+4. Search by item code, Hebrew title, or pages, or browse the hierarchy.
+5. Use the **Today** cards to resume learning or open the recommended task.
+6. Work from the active item's Tasks, Notes, Study session, and Progress
+   sections.
+
+The Study session section includes 15, 30, 45, and 60-minute quick actions.
+The active item is included in the page URL so a browser refresh keeps the
+same workspace open.
+
+If the GUI reports that the schema is outdated, click **Upgrade** in the
+sidebar. This applies Alembic migrations without resetting or deleting data.
 
 The Streamlit interface and CLI use the same Application Services and database.
 The GUI does not access repositories directly.
 
 For the Sprint 3 rules and limitations, see
 [docs/sprint-3-daily-study-workflow.md](docs/sprint-3-daily-study-workflow.md).
+For the rebuilt dogfooding interface, see
+[docs/sprint-3-5-gui-rebuild.md](docs/sprint-3-5-gui-rebuild.md).
 
 ## Dogfooding
 
